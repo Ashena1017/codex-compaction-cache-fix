@@ -69,7 +69,7 @@ CC Switch 切换供应商时会更新 Codex 配置。控制面板提供三种方
 
 也可以运行 `python gui.py` 打开桌面控制面板，从单一窗口管理代理状态、启动/停止、恢复直连、供应商同步方式、自启、压缩记录、本地自检和实验。实验会实际调用模型并产生费用，运行前需要确认。
 
-界面默认夜间模式，右上角可切换日间模式并保存偏好。整理后的本机安装目录使用 `app`（程序）、`app/tests`（测试）、`data`（配置和运行记录）、`shortcuts`（备用 CMD 入口）、`docs`（说明）。`CodexCompactionFix.exe` 为套壳入口，仍需要 `data/settings.json` 中 `python_executable` 指定的 Python 环境和旁边的程序文件，并非独立便携版。启动器源码见 `shell_launcher.py`；构建时需安装 PyInstaller。
+界面默认采用深灰背景、灰白文字和中性灰按钮。左侧导航分为概览、供应商同步、登录自启、诊断与实验、操作记录；左下角可切换日间模式并保存偏好。首页分别显示代理是否运行和 Codex 是否接入代理，完整输出放在操作记录页。关闭面板后，已经启动的代理继续运行。整理后的本机安装目录使用 `app`（程序）、`app/tests`（测试）、`data`（配置和运行记录）、`shortcuts`（备用 CMD 入口）、`docs`（说明）。`CodexCompactionFix.exe` 为套壳入口，仍需要 `data/settings.json` 中 `python_executable` 指定的 Python 环境和旁边的程序文件，并非独立便携版。启动器源码见 `shell_launcher.py`；构建时需安装 PyInstaller。
 
 双击脚本使用 PATH 中的 `python`。安装依赖、配置和运行脚本时应使用同一个 Python 环境。
 

@@ -54,3 +54,32 @@ class ScrollableTools(ttk.Frame):
 
     def apply_theme(self, background):
         self.canvas.configure(background=background)
+
+
+class ScrollablePage(ScrollableTools):
+    """A full-width page; scrolling is a fallback for small windows or large fonts."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.configure(style="TFrame")
+        self.content.configure(style="TFrame", padding=(0, 0, 14, 8))
+        self.canvas.configure(width=1, height=1, yscrollincrement=1)
+
+    def _wheel(self, event):
+        widget = event.widget
+        while widget is not None:
+            if widget is self:
+                if self.content.winfo_reqheight() > self.canvas.winfo_height():
+                    step = -1 if event.delta > 0 else 1
+                    self.canvas.yview_scroll(step*max(1, abs(event.delta)//120)*36, "units")
+                return "break"
+            widget = getattr(widget, "master", None)
+
+    def _resize_content(self, _event=None):
+        super()._resize_content(_event)
+        if self.content.winfo_reqheight() > self.canvas.winfo_height():
+            if not self.scrollbar.winfo_manager():
+                self.scrollbar.pack(side="right", fill="y")
+        else:
+            self.scrollbar.pack_forget()
+            self.canvas.yview_moveto(0)
