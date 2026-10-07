@@ -19,19 +19,25 @@ import requests
 from proxy import VERSION, make_server
 from route_sync import ProviderRouteManager
 from config_watch import WindowsConfigWatcher
+from layout import APP_DIR, DATA_DIR, INSTALL_DIR, SETTINGS_FILE
 
-ROOT = Path(__file__).resolve().parent
+ROOT = INSTALL_DIR
 
 
 def settings():
-    return json.loads((ROOT/"settings.json").read_text(encoding="utf-8-sig"))
+    return json.loads(_settings_path().read_text(encoding="utf-8-sig"))
+
+
+def _settings_path():
+    candidate = ROOT / "data" / "settings.json"
+    return candidate if candidate.is_file() else (ROOT / "settings.json" if (ROOT / "settings.json").is_file() else SETTINGS_FILE)
 
 
 SYNC_MODES = {"poll", "event", "manual"}
 
 
 def write_settings(values):
-    path = ROOT/"settings.json"
+    path = _settings_path()
     temporary = path.with_name(path.name+".new")
     temporary.write_text(json.dumps(values, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
     temporary.replace(path)
@@ -51,7 +57,7 @@ def set_sync_mode(mode):
 def sync_provider():
     if not health():
         raise RuntimeError("代理未运行。请先启动修复，再同步供应商。")
-    ProviderRouteManager(ROOT/"settings.json").sync()
+    ProviderRouteManager(_settings_path()).sync()
     print("已读取当前 Codex 供应商，并更新代理上游。地址和密钥不会显示。")
 
 
@@ -117,12 +123,12 @@ def start():
             raise RuntimeError("端口被旧位置的代理占用。请先停止旧代理，再启动这个目录的版本。")
         if existing.get("version", VERSION) != VERSION:
             raise RuntimeError("正在运行旧版代理。先运行“停止代理”，再运行“启动修复”，才能加载新代码。")
-        manager = ProviderRouteManager(ROOT/"settings.json")
+        manager = ProviderRouteManager(_settings_path())
         manager.sync()
         print("代理已经在运行，修复已启用，不会再开第二个代理。")
         return
     s = settings()
-    manager = ProviderRouteManager(ROOT/"settings.json")
+    manager = ProviderRouteManager(_settings_path())
     upstream = manager.discover()
     server = make_server(upstream, s["port"], s["events_path"], s.get("snapshot_path"))
     server.state.set_upstream(upstream, manager.expected_authorization())
@@ -186,7 +192,7 @@ def start():
 
 
 def restore():
-    manager = ProviderRouteManager(ROOT/"settings.json")
+    manager = ProviderRouteManager(_settings_path())
     changed = manager.restore()
     print("已恢复当前供应商直连。模型、密钥和其他配置没有改动。" if changed else "当前配置已经是直连。")
     print("重新打开聊天或重启 Codex，让它加载这个配置。")
@@ -262,7 +268,7 @@ def records():
 
 def stop():
     service = health()
-    ProviderRouteManager(ROOT/"settings.json").restore()
+    ProviderRouteManager(_settings_path()).restore()
     if not service:
         print("已恢复直连，代理原本就没有运行。")
         return
@@ -283,7 +289,8 @@ def stop():
                       os.path.normcase(str(Path(sys.executable).with_name("python.exe"))),
                       os.path.normcase(str(Path(sys.executable).with_name("pythonw.exe")))}
     same_python = os.path.normcase(process.get("ExecutablePath", "")) in allowed_python
-    owned = any(str(ROOT/name).lower() in process.get("CommandLine", "").lower() for name in ("control.py", "proxy.py"))
+    owned = any(str(APP_DIR/name).lower() in process.get("CommandLine", "").lower()
+                for name in ("control.py", "proxy.py"))
     if not same_python or not owned:
         raise RuntimeError("已恢复直连，但进程信息不匹配，没有停止它。")
     os.kill(pid, signal.SIGTERM)

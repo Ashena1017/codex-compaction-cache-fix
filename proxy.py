@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 
 import requests
 from snapshot_store import SnapshotStore
+from layout import INSTALL_DIR
 
 VERSION = "1.2.0"
 UNCHANGED = object()
@@ -328,7 +329,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             return self.json_reply(200, {"ok": True, "version": VERSION, "pid": os.getpid(),
-                                         "directory": str(Path(__file__).resolve().parent),
+                                         "directory": str(INSTALL_DIR),
                                          "snapshots": self.server.state.cache.status()})
         if self.path == "/metrics":
             return self.json_reply(200, self.server.state.metrics())

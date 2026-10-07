@@ -10,22 +10,22 @@ import time
 import tomllib
 import uuid
 from pathlib import Path
-from experiment_support import read_config, codex_binary
 
 import requests
 
 from proxy import SSEInspector, make_server, summary_error
+from layout import SETTINGS_FILE
 
 
 def configured_provider():
-    config = read_config()
+    config = tomllib.loads((Path.home()/".codex"/"config.toml").read_text(encoding="utf-8-sig"))
     provider = config["model_providers"][config["model_provider"]]
     key = provider.get("experimental_bearer_token") or os.environ.get(provider.get("env_key", ""))
     if not key:
         raise RuntimeError("Configured provider credential unavailable")
     base = provider["base_url"]
     if base.startswith("http://127.0.0.1:"):
-        settings = json.loads(Path(__file__).with_name("settings.json").read_text(encoding="utf-8-sig"))
+        settings = json.loads(SETTINGS_FILE.read_text(encoding="utf-8-sig"))
         base = settings["upstream_base_url"]
     return base.rstrip("/"), key, config["model"]
 

@@ -8,8 +8,9 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from layout import INSTALL_DIR
 
-ROOT = Path(__file__).resolve().parent
+ROOT = INSTALL_DIR
 
 # Installation-specific names avoid changing another copy's startup task.
 def task_name(root=ROOT):
@@ -79,14 +80,20 @@ def manage(action, root=ROOT):
     if action not in ("enable", "disable", "status"):
         raise ValueError("未知操作。")
     root = Path(root).resolve()
-    if action == "enable" and not all((root/name).is_file() for name in ("control.py", "settings.json")):
-        raise RuntimeError("先完成配置，确认 control.py 和 settings.json 都在当前目录。")
-    background_python = Path(sys.executable).with_name("pythonw.exe")
+    app_dir = root/"app" if (root/"app").is_dir() else root
+    data_dir = root/"data" if (root/"data").is_dir() else root
+    settings_file = data_dir/"settings.json"
+    control_file = app_dir/"control.py"
+    if action == "enable" and not (control_file.is_file() and settings_file.is_file()):
+        raise RuntimeError("安装文件不完整：缺少 control.py 或 settings.json。")
+    settings = json.loads(settings_file.read_text(encoding="utf-8-sig")) if settings_file.is_file() else {}
+    configured_python = Path(settings.get("python_executable") or sys.executable)
+    background_python = configured_python.with_name("pythonw.exe")
     if not background_python.is_file():
         raise RuntimeError("当前 Python 安装缺少 pythonw.exe，无法创建无窗口的自启任务。")
     env = dict(os.environ, COMPACT_FIX_ACTION=action, COMPACT_FIX_ROOT=str(root),
                COMPACT_FIX_TASK_NAME=task_name(root), COMPACT_FIX_PYTHON=str(background_python),
-               COMPACT_FIX_ARGUMENTS=subprocess.list2cmdline([str(root/"control.py"), "start"]))
+               COMPACT_FIX_ARGUMENTS=subprocess.list2cmdline([str(control_file), "start"]))
     result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", SCRIPT],
                             env=env, capture_output=True, text=True, encoding="utf-8", timeout=30,
                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

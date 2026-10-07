@@ -11,11 +11,16 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 import requests
+from layout import APP_DIR, DATA_DIR, INSTALL_DIR, SETTINGS_FILE
 
 
-ROOT = Path(__file__).resolve().parent
-SETTINGS = ROOT / "settings.json"
-PYTHON = Path(sys.executable)
+ROOT = INSTALL_DIR
+SETTINGS = SETTINGS_FILE
+try:
+    _saved_settings = json.loads(SETTINGS.read_text(encoding="utf-8-sig"))
+except (OSError, ValueError):
+    _saved_settings = {}
+PYTHON = Path(_saved_settings.get("python_executable") or sys.executable)
 PYTHONW = PYTHON.with_name("pythonw.exe")
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 DETACHED = getattr(subprocess, "DETACHED_PROCESS", 0) | CREATE_NO_WINDOW
@@ -30,29 +35,61 @@ class ControlPanel(tk.Tk):
         self.configure(background="#f3f5f7")
         self.results = queue.Queue()
         self.busy = False
+        self.dark = self._saved_theme() != "light"
         self._style()
         self._build()
+        self._apply_theme()
         self.refresh()
         self.after(150, self._drain)
         self.after(2500, self._tick)
 
     def _style(self):
         style = ttk.Style(self)
-        style.theme_use("vista" if "vista" in style.theme_names() else "clam")
+        style.theme_use("clam")
         style.configure("TFrame", background="#f3f5f7")
         style.configure("Panel.TFrame", background="#ffffff")
         style.configure("TLabel", background="#f3f5f7", foreground="#263238", font=("Segoe UI", 10))
         style.configure("Title.TLabel", font=("Segoe UI", 19, "bold"), foreground="#162a36")
         style.configure("Section.TLabel", background="#ffffff", font=("Segoe UI", 11, "bold"), foreground="#162a36")
         style.configure("Muted.TLabel", background="#ffffff", foreground="#5e6c73", wraplength=720)
-        style.configure("Action.TButton", padding=(12, 8), font=("Segoe UI", 10))
+        style.configure("Action.TButton", padding=(12, 8), font=("Segoe UI", 10),
+                         background="#28748a", foreground="#ffffff", borderwidth=0)
+        style.map("Action.TButton", background=[("active", "#3193a7"), ("disabled", "#48545d")])
         style.configure("TRadiobutton", background="#ffffff", font=("Segoe UI", 10))
+
+    def _apply_theme(self):
+        if self.dark:
+            bg, panel, text, muted, field = "#111820", "#1b2630", "#edf3f6", "#a9bbc4", "#0d141a"
+            accent, hover = "#28748a", "#3193a7"
+            self.theme_button.configure(text="日间模式")
+        else:
+            bg, panel, text, muted, field = "#f3f5f7", "#ffffff", "#263238", "#5e6c73", "#fbfcfd"
+            accent, hover = "#28657a", "#347c91"
+            self.theme_button.configure(text="夜间模式")
+        self.configure(background=bg)
+        style = ttk.Style(self)
+        style.configure("TFrame", background=bg)
+        style.configure("Panel.TFrame", background=panel)
+        style.configure("TLabel", background=bg, foreground=text)
+        style.configure("Title.TLabel", background=bg, foreground=text)
+        style.configure("Section.TLabel", background=panel, foreground=text)
+        style.configure("Muted.TLabel", background=panel, foreground=muted)
+        style.configure("TRadiobutton", background=panel, foreground=text)
+        style.configure("Action.TButton", background=accent, foreground="#ffffff")
+        style.map("Action.TButton", background=[("active", hover), ("disabled", "#48545d")])
+        if hasattr(self, "output"):
+            self.output.configure(background=field, foreground=text, insertbackground=text)
+        self._theme = (bg, panel, text, muted, field)
 
     def _build(self):
         outer = ttk.Frame(self, padding=20)
         outer.pack(fill="both", expand=True)
         ttk.Label(outer, text="Codex 压缩缓存修复", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(outer, text="代理状态、供应商同步与启动设置", padding=(0, 3, 0, 14)).pack(anchor="w")
+        heading = ttk.Frame(outer)
+        heading.pack(fill="x", pady=(3, 14))
+        ttk.Label(heading, text="代理状态、供应商同步与启动设置").pack(side="left")
+        self.theme_button = self._button(heading, "日间模式", self.toggle_theme)
+        self.theme_button.pack(side="right")
 
         top = ttk.Frame(outer, style="Panel.TFrame", padding=14)
         top.pack(fill="x", pady=(0, 12))
@@ -120,6 +157,22 @@ class ControlPanel(tk.Tk):
     def _button(self, parent, text, command):
         return ttk.Button(parent, text=text, command=command, style="Action.TButton")
 
+    def toggle_theme(self):
+        self.dark = not self.dark
+        self._apply_theme()
+        try:
+            values = json.loads(SETTINGS.read_text(encoding="utf-8-sig"))
+            values["ui_theme"] = "dark" if self.dark else "light"
+            temporary = SETTINGS.with_name(SETTINGS.name+".new")
+            temporary.write_text(json.dumps(values, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
+            temporary.replace(SETTINGS)
+        except (OSError, ValueError) as error:
+            self._record("主题已切换，但未能保存偏好："+str(error))
+
+    @staticmethod
+    def _saved_theme():
+        return _saved_settings.get("ui_theme", "dark")
+
     def _saved_mode(self):
         try:
             value = json.loads(SETTINGS.read_text(encoding="utf-8-sig")).get("provider_sync_mode", "event")
@@ -140,7 +193,7 @@ class ControlPanel(tk.Tk):
 
         def worker():
             try:
-                result = subprocess.run([str(PYTHON), *map(str, args)], cwd=ROOT, capture_output=True,
+                result = subprocess.run([str(PYTHON), *map(str, args)], cwd=APP_DIR, capture_output=True,
                                         text=True, encoding="utf-8", errors="replace", timeout=timeout,
                                         creationflags=CREATE_NO_WINDOW)
                 self.results.put((result.returncode, (result.stdout+result.stderr).strip() or "完成。", callback))
@@ -163,7 +216,7 @@ class ControlPanel(tk.Tk):
     def _start_background(self):
         executable = PYTHONW if PYTHONW.exists() else PYTHON
         try:
-            subprocess.Popen([str(executable), str(ROOT/"control.py"), "start"], cwd=ROOT,
+            subprocess.Popen([str(executable), str(APP_DIR/"control.py"), "start"], cwd=APP_DIR,
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              creationflags=DETACHED)
             self._record("已发出启动命令，正在等待代理健康检查。")
@@ -172,37 +225,37 @@ class ControlPanel(tk.Tk):
             self._record("启动失败："+str(error))
 
     def start_proxy(self):
-        self._run([ROOT/"control.py", "status"], lambda code, _text: self._start_background())
+        self._run([APP_DIR/"control.py", "status"], lambda code, _text: self._start_background())
 
     def restore_route(self):
         if messagebox.askyesno("恢复直连", "把当前 Codex 供应商地址恢复为直连？"):
-            self._run([ROOT/"control.py", "restore"], lambda *_: self.refresh())
+            self._run([APP_DIR/"control.py", "restore"], lambda *_: self.refresh())
 
     def stop_proxy(self):
         if messagebox.askyesno("停止代理", "恢复当前供应商直连并停止代理？"):
-            self._run([ROOT/"control.py", "stop"], lambda *_: self.refresh())
+            self._run([APP_DIR/"control.py", "stop"], lambda *_: self.refresh())
 
     def sync_provider(self):
-        self._run([ROOT/"control.py", "sync-provider"], lambda *_: self.refresh())
+        self._run([APP_DIR/"control.py", "sync-provider"], lambda *_: self.refresh())
 
     def set_mode(self, value):
-        self._run([ROOT/"control.py", "set-sync-mode", "--mode", value])
+        self._run([APP_DIR/"control.py", "set-sync-mode", "--mode", value])
 
     def show_records(self):
-        self._run([ROOT/"control.py", "records"])
+        self._run([APP_DIR/"control.py", "records"])
 
     def startup(self, action):
-        self._run([ROOT/"autostart.py", action])
+        self._run([APP_DIR/"autostart.py", action])
 
     def _paid_experiment(self, script, details):
         if messagebox.askyesno("实验会产生费用", f"{details}。确认现在运行 {script} 吗？"):
-            self._run([ROOT/script], timeout=1800)
+            self._run([APP_DIR/script], timeout=1800)
 
     def self_test(self):
-        self._run(["-m", "unittest", "-v", "test_config_watch", "test_route_sync", "test_proxy", "test_autostart"])
+        self._run(["-m", "unittest", "discover", "-v", "-s", APP_DIR/"测试", "-t", APP_DIR])
 
     def refresh(self):
-        self._run([ROOT/"control.py", "status"], self._show_status)
+        self._run([APP_DIR/"control.py", "status"], self._show_status)
 
     def _show_status(self, code, output):
         self.status_var.set(output or ("状态检查失败。" if code else "代理未运行。"))
