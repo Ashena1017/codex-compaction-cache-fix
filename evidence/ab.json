@@ -1,0 +1,156 @@
+{
+  "model": "gpt-6.1-sol",
+  "synthetic_input_only": true,
+  "pairs": [
+    {
+      "trial": 1,
+      "warm": {
+        "input_tokens": 6810,
+        "cached_tokens": 0,
+        "cache_write_tokens": 6807,
+        "output_tokens": 5,
+        "hit_rate": 0.0,
+        "elapsed_seconds": 2.352,
+        "nonempty_summary": true,
+        "tool_calls": 0
+      },
+      "baseline": {
+        "input_tokens": 4920,
+        "cached_tokens": 0,
+        "cache_write_tokens": 4917,
+        "output_tokens": 80,
+        "hit_rate": 0.0,
+        "elapsed_seconds": 4.541,
+        "nonempty_summary": true,
+        "tool_calls": 0
+      },
+      "fixed": {
+        "input_tokens": 6844,
+        "cached_tokens": 6807,
+        "cache_write_tokens": 34,
+        "output_tokens": 82,
+        "hit_rate": 0.994593804792519,
+        "elapsed_seconds": 4.71,
+        "nonempty_summary": true,
+        "tool_calls": 0
+      }
+    },
+    {
+      "trial": 2,
+      "warm": {
+        "input_tokens": 6804,
+        "cached_tokens": 0,
+        "cache_write_tokens": 6801,
+        "output_tokens": 5,
+        "hit_rate": 0.0,
+        "elapsed_seconds": 3.005,
+        "nonempty_summary": true,
+        "tool_calls": 0
+      },
+      "baseline": {
+        "input_tokens": 4914,
+        "cached_tokens": 0,
+        "cache_write_tokens": 4911,
+        "output_tokens": 68,
+        "hit_rate": 0.0,
+        "elapsed_seconds": 3.99,
+        "nonempty_summary": true,
+        "tool_calls": 0
+      },
+      "fixed": {
+        "input_tokens": 6838,
+        "cached_tokens": 6801,
+        "cache_write_tokens": 34,
+        "output_tokens": 78,
+        "hit_rate": 0.994589061128985,
+        "elapsed_seconds": 7.019,
+        "nonempty_summary": true,
+        "tool_calls": 0
+      }
+    }
+  ],
+  "baseline_weighted_hit_rate": 0.0,
+  "fixed_weighted_hit_rate": 0.994591434000877,
+  "proxy_metrics": {
+    "version": "1.0.0",
+    "counters": {
+      "snapshot-saved": 2,
+      "tool-prefix-restored": 2
+    },
+    "recent": [
+      {
+        "request_kind": "turn",
+        "local_compaction": false,
+        "patched": false,
+        "reason": "snapshot-saved",
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "elapsed_ms": 2349,
+        "timestamp": "2026-10-07T08:56:56Z"
+      },
+      {
+        "request_kind": "compaction",
+        "local_compaction": true,
+        "patched": true,
+        "shared_items": 1,
+        "reason": "tool-prefix-restored",
+        "mode": "standard",
+        "tool_count": 4,
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "summary_error": null,
+        "usage": {
+          "input_tokens": 6844,
+          "input_tokens_details": {
+            "cache_write_tokens": 34,
+            "cached_tokens": 6807
+          },
+          "output_tokens": 82,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 6926
+        },
+        "elapsed_ms": 4693,
+        "timestamp": "2026-10-07T08:57:05Z"
+      },
+      {
+        "request_kind": "turn",
+        "local_compaction": false,
+        "patched": false,
+        "reason": "snapshot-saved",
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "elapsed_ms": 2978,
+        "timestamp": "2026-10-07T08:57:08Z"
+      },
+      {
+        "request_kind": "compaction",
+        "local_compaction": true,
+        "patched": true,
+        "shared_items": 1,
+        "reason": "tool-prefix-restored",
+        "mode": "standard",
+        "tool_count": 4,
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "summary_error": null,
+        "usage": {
+          "input_tokens": 6838,
+          "input_tokens_details": {
+            "cache_write_tokens": 34,
+            "cached_tokens": 6801
+          },
+          "output_tokens": 78,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 6916
+        },
+        "elapsed_ms": 6999,
+        "timestamp": "2026-10-07T08:57:19Z"
+      }
+    ]
+  },
+  "passed": true
+}

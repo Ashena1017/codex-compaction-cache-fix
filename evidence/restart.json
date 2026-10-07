@@ -1,0 +1,73 @@
+{
+  "version": "1.1.0",
+  "model": "gpt-6.1-sol",
+  "ephemeral": true,
+  "scenario": "warm-restart-compact-continue",
+  "warm_usage": [
+    {
+      "totalTokens": 13001,
+      "inputTokens": 12996,
+      "cachedInputTokens": 0,
+      "cacheWriteInputTokens": 12993,
+      "outputTokens": 5,
+      "reasoningOutputTokens": 0
+    }
+  ],
+  "before_restart": {
+    "persistent": true,
+    "restored_at_start": 0,
+    "available": 1,
+    "ttl_seconds": 86400,
+    "error": null
+  },
+  "after_restart": {
+    "persistent": true,
+    "restored_at_start": 1,
+    "available": 1,
+    "ttl_seconds": 86400,
+    "error": null
+  },
+  "compactions": [
+    {
+      "request_kind": "compaction",
+      "local_compaction": true,
+      "patched": true,
+      "shared_items": 6,
+      "reason": "tool-prefix-restored",
+      "mode": "lite",
+      "tool_count": 4,
+      "model": "gpt-6.1-sol",
+      "status": 200,
+      "summary_error": null,
+      "usage": {
+        "input_tokens": 13035,
+        "input_tokens_details": {
+          "cache_write_tokens": 39,
+          "cached_tokens": 12993
+        },
+        "output_tokens": 64,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 13099
+      },
+      "elapsed_ms": 8024,
+      "timestamp": "2026-10-07T09:30:55Z"
+    }
+  ],
+  "continuation_usage": [
+    {
+      "totalTokens": 13155,
+      "inputTokens": 13150,
+      "cachedInputTokens": 0,
+      "cacheWriteInputTokens": 13147,
+      "outputTokens": 5,
+      "reasoningOutputTokens": 0
+    }
+  ],
+  "unexpected_tool_requests": 0,
+  "cache_hit_rates": [
+    0.9967779056386651
+  ],
+  "passed": true
+}

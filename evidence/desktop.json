@@ -1,0 +1,237 @@
+{
+  "model": "gpt-6.1-sol",
+  "ephemeral": true,
+  "scenarios": [
+    {
+      "scenario": "manual",
+      "warm_usage": [
+        {
+          "totalTokens": 13015,
+          "inputTokens": 13010,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 13007,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        }
+      ],
+      "continuation_usage": [
+        {
+          "totalTokens": 13173,
+          "inputTokens": 13168,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 13165,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        }
+      ],
+      "compactions": [
+        {
+          "request_kind": "compaction",
+          "local_compaction": true,
+          "patched": true,
+          "shared_items": 6,
+          "reason": "tool-prefix-restored",
+          "mode": "lite",
+          "tool_count": 4,
+          "model": "gpt-6.1-sol",
+          "status": 200,
+          "summary_error": null,
+          "usage": {
+            "input_tokens": 13050,
+            "input_tokens_details": {
+              "cache_write_tokens": 40,
+              "cached_tokens": 13007
+            },
+            "output_tokens": 67,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 13117
+          },
+          "elapsed_ms": 4946,
+          "timestamp": "2026-10-07T09:03:35Z"
+        }
+      ],
+      "passed": true
+    },
+    {
+      "scenario": "automatic",
+      "warm_usage": [
+        {
+          "totalTokens": 13015,
+          "inputTokens": 13010,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 13007,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        }
+      ],
+      "continuation_usage": [
+        {
+          "totalTokens": 13015,
+          "inputTokens": 13010,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 13007,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        },
+        {
+          "totalTokens": 13116,
+          "inputTokens": 13050,
+          "cachedInputTokens": 13007,
+          "cacheWriteInputTokens": 40,
+          "outputTokens": 66,
+          "reasoningOutputTokens": 0
+        },
+        {
+          "totalTokens": 2458,
+          "inputTokens": 0,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 0,
+          "outputTokens": 0,
+          "reasoningOutputTokens": 0
+        },
+        {
+          "totalTokens": 13172,
+          "inputTokens": 13167,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 13164,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        }
+      ],
+      "compactions": [
+        {
+          "request_kind": "compaction",
+          "local_compaction": true,
+          "patched": true,
+          "shared_items": 6,
+          "reason": "tool-prefix-restored",
+          "mode": "lite",
+          "tool_count": 4,
+          "model": "gpt-6.1-sol",
+          "status": 200,
+          "summary_error": null,
+          "usage": {
+            "input_tokens": 13050,
+            "input_tokens_details": {
+              "cache_write_tokens": 40,
+              "cached_tokens": 13007
+            },
+            "output_tokens": 66,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 13116
+          },
+          "elapsed_ms": 6145,
+          "timestamp": "2026-10-07T09:03:50Z"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "unexpected_tool_requests": 0,
+  "passed": true,
+  "proxy_metrics": {
+    "version": "1.0.0",
+    "counters": {
+      "snapshot-saved": 4,
+      "tool-prefix-restored": 2
+    },
+    "recent": [
+      {
+        "request_kind": "turn",
+        "local_compaction": false,
+        "patched": false,
+        "reason": "snapshot-saved",
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "elapsed_ms": 3459,
+        "timestamp": "2026-10-07T09:03:30Z"
+      },
+      {
+        "request_kind": "compaction",
+        "local_compaction": true,
+        "patched": true,
+        "shared_items": 6,
+        "reason": "tool-prefix-restored",
+        "mode": "lite",
+        "tool_count": 4,
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "summary_error": null,
+        "usage": {
+          "input_tokens": 13050,
+          "input_tokens_details": {
+            "cache_write_tokens": 40,
+            "cached_tokens": 13007
+          },
+          "output_tokens": 67,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 13117
+        },
+        "elapsed_ms": 4946,
+        "timestamp": "2026-10-07T09:03:35Z"
+      },
+      {
+        "request_kind": "turn",
+        "local_compaction": false,
+        "patched": false,
+        "reason": "snapshot-saved",
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "elapsed_ms": 3837,
+        "timestamp": "2026-10-07T09:03:38Z"
+      },
+      {
+        "request_kind": "turn",
+        "local_compaction": false,
+        "patched": false,
+        "reason": "snapshot-saved",
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "elapsed_ms": 4865,
+        "timestamp": "2026-10-07T09:03:43Z"
+      },
+      {
+        "request_kind": "compaction",
+        "local_compaction": true,
+        "patched": true,
+        "shared_items": 6,
+        "reason": "tool-prefix-restored",
+        "mode": "lite",
+        "tool_count": 4,
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "summary_error": null,
+        "usage": {
+          "input_tokens": 13050,
+          "input_tokens_details": {
+            "cache_write_tokens": 40,
+            "cached_tokens": 13007
+          },
+          "output_tokens": 66,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 13116
+        },
+        "elapsed_ms": 6145,
+        "timestamp": "2026-10-07T09:03:50Z"
+      },
+      {
+        "request_kind": "turn",
+        "local_compaction": false,
+        "patched": false,
+        "reason": "snapshot-saved",
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "elapsed_ms": 4367,
+        "timestamp": "2026-10-07T09:03:54Z"
+      }
+    ]
+  }
+}

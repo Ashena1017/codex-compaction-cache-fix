@@ -1,0 +1,96 @@
+{
+  "model": "gpt-6.1-sol",
+  "ephemeral": true,
+  "installed_config": true,
+  "scenarios": [
+    {
+      "scenario": "manual",
+      "warm_usage": [
+        {
+          "totalTokens": 13015,
+          "inputTokens": 13010,
+          "cachedInputTokens": 0,
+          "cacheWriteInputTokens": 13007,
+          "outputTokens": 5,
+          "reasoningOutputTokens": 0
+        }
+      ],
+      "compactions": [
+        {
+          "request_kind": "compaction",
+          "local_compaction": true,
+          "patched": true,
+          "shared_items": 6,
+          "reason": "tool-prefix-restored",
+          "mode": "lite",
+          "tool_count": 4,
+          "model": "gpt-6.1-sol",
+          "status": 200,
+          "summary_error": null,
+          "usage": {
+            "input_tokens": 13050,
+            "input_tokens_details": {
+              "cache_write_tokens": 40,
+              "cached_tokens": 13007
+            },
+            "output_tokens": 68,
+            "output_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "total_tokens": 13118
+          },
+          "elapsed_ms": 4288,
+          "timestamp": "2026-10-07T09:06:34Z"
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "unexpected_tool_requests": 0,
+  "passed": true,
+  "proxy_metrics": {
+    "version": "1.0.0",
+    "counters": {
+      "snapshot-saved": 1,
+      "tool-prefix-restored": 1
+    },
+    "recent": [
+      {
+        "request_kind": "turn",
+        "local_compaction": false,
+        "patched": false,
+        "reason": "snapshot-saved",
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "elapsed_ms": 4052,
+        "timestamp": "2026-10-07T09:06:29Z"
+      },
+      {
+        "request_kind": "compaction",
+        "local_compaction": true,
+        "patched": true,
+        "shared_items": 6,
+        "reason": "tool-prefix-restored",
+        "mode": "lite",
+        "tool_count": 4,
+        "model": "gpt-6.1-sol",
+        "status": 200,
+        "summary_error": null,
+        "usage": {
+          "input_tokens": 13050,
+          "input_tokens_details": {
+            "cache_write_tokens": 40,
+            "cached_tokens": 13007
+          },
+          "output_tokens": 68,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 13118
+        },
+        "elapsed_ms": 4288,
+        "timestamp": "2026-10-07T09:06:34Z"
+      }
+    ]
+  }
+}

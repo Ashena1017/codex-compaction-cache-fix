@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+settings.json
+events.jsonl
+*.dpapi
+*.tmp
+*-results.json
+*-report.json
+config*.toml
+*.log
+.env
