@@ -215,6 +215,9 @@ def stop():
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=("start", "status", "restore", "records", "stop"))
     args = parser.parse_args()

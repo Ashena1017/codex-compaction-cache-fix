@@ -23,7 +23,7 @@ class AutostartTests(unittest.TestCase):
     @unittest.skipUnless(os.name == 'nt', 'Windows task API wrapper')
     def test_paths_with_spaces_are_passed_as_data_and_task_is_not_run(self):
         with tempfile.TemporaryDirectory(prefix='compact test ') as folder:
-            root = Path(folder)
+            root = Path(folder).resolve()
             (root/'control.py').touch()
             (root/'settings.json').write_text('{}')
             response = MagicMock(returncode=0, stdout=json.dumps({'ok':True, 'enabled':True}))
@@ -50,7 +50,7 @@ class AutostartTests(unittest.TestCase):
         response = MagicMock(returncode=1, stdout=json.dumps({'ok':False,'code':-1}))
         with patch.object(autostart.subprocess, 'run', return_value=response):
             with self.assertRaises(RuntimeError):
-                autostart.manage('enable')
+                autostart.manage('status')
 
 
 if __name__ == '__main__':

@@ -252,7 +252,8 @@ class ConfigTests(unittest.TestCase):
 
     def test_duplicate_start_reuses_service(self):
         with patch.object(control, "health", return_value={"directory": str(control.ROOT)}), \
-             patch.object(control, "set_route") as route, patch.object(control, "make_server") as server:
+             patch.object(control, "set_route") as route, patch.object(control, "make_server") as server, \
+             patch("builtins.print"):
             control.start()
             route.assert_called_once_with(True)
             server.assert_not_called()
