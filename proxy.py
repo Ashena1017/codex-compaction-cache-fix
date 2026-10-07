@@ -20,7 +20,8 @@ from urllib.parse import urlsplit
 import requests
 from snapshot_store import SnapshotStore
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
+UNCHANGED = object()
 MAX_BODY = 64 * 1024 * 1024
 MAX_SUMMARY_STREAM = 16 * 1024 * 1024
 HOP_HEADERS = {"host", "connection", "keep-alive", "transfer-encoding",
@@ -269,8 +270,24 @@ class State:
         self.cache = PrefixCache(storage_path=snapshot_path, namespace=self.upstream)
         self.events = Path(events) if events else None
         self.lock = threading.Lock()
+        self.upstream_lock = threading.RLock()
+        self.sync_callback = None
+        self.expected_authorization = None
         self.counters = Counter()
         self.recent = []
+
+    def set_upstream(self, upstream, expected_authorization=UNCHANGED):
+        parsed = urlsplit(upstream)
+        if parsed.scheme not in ("https", "http") or not parsed.netloc or parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("Invalid upstream base URL")
+        value = upstream.rstrip("/")
+        with self.upstream_lock:
+            if value != self.upstream:
+                self.upstream = value
+                self.cache = PrefixCache(storage_path=self.cache.store.path if self.cache.store else None,
+                                         namespace=value)
+            if expected_authorization is not UNCHANGED:
+                self.expected_authorization = expected_authorization
 
     def record(self, note):
         clean = {k: v for k, v in note.items() if k in
@@ -325,6 +342,26 @@ class Handler(BaseHTTPRequestHandler):
         started = time.monotonic()
         note = {"reason": "passthrough", "patched": False}
         try:
+            if state.sync_callback:
+                try:
+                    state.sync_callback()
+                except (OSError, ValueError, RuntimeError):
+                    note["reason"] = "provider-route-sync-failed"
+                    self.json_reply(503, {"error": {"message": "Provider route could not be verified; request was not forwarded"}})
+                    return
+            with state.upstream_lock:
+                upstream = state.upstream
+                cache = state.cache
+                expected_auth = state.expected_authorization
+            supplied_auth = self.headers.get("Authorization", "")
+            if not expected_auth:
+                note["reason"] = "provider-credential-unverifiable"
+                self.json_reply(503, {"error": {"message": "Provider credential cannot be verified; request was not forwarded"}})
+                return
+            if hashlib.sha256(supplied_auth.encode()).hexdigest() != expected_auth:
+                note["reason"] = "provider-credential-mismatch"
+                self.json_reply(401, {"error": {"message": "Credential does not match the active Codex provider"}})
+                return
             if self.headers.get("Origin"):
                 return self.json_reply(403, {"error": {"message": "Browser-origin requests are unsupported"}})
             if not self.headers.get("Authorization"):
@@ -348,7 +385,7 @@ class Handler(BaseHTTPRequestHandler):
                 body = json.loads(raw or b"{}")
                 if not isinstance(body, dict):
                     return self.json_reply(400, {"error": {"message": "Expected a JSON object"}})
-                body, note = state.cache.prepare(body, dict(self.headers))
+                body, note = cache.prepare(body, dict(self.headers))
                 note["model"] = body.get("model")
                 if note["patched"]:
                     raw = encode(body)
@@ -356,7 +393,7 @@ class Handler(BaseHTTPRequestHandler):
             headers = {k: v for k, v in self.headers.items() if k.lower() not in HOP_HEADERS}
             headers["Accept-Encoding"] = "identity"
             with requests.Session() as session:
-                with session.request(self.command, state.upstream+suffix, data=raw, headers=headers,
+                with session.request(self.command, upstream+suffix, data=raw, headers=headers,
                                      stream=True, timeout=(30, 600), allow_redirects=False) as response:
                     note["status"] = response.status_code
                     if compact and response.status_code == 200:

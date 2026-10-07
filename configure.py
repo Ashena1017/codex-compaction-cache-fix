@@ -28,7 +28,7 @@ def build_settings(config_path, upstream=None, provider_id=None, port=28615):
     if current not in (upstream, local):
         raise ValueError("Upstream must match the current provider URL (or the provider must already use this proxy)")
     return {"upstream_base_url": upstream, "local_base_url": local,
-            "provider_id": provider_id, "port": port,
+            "provider_id": provider_id, "provider_sync_mode": "event", "port": port,
             "health_url": f"http://127.0.0.1:{port}/health",
             "config_path": str(config_path), "events_path": str(ROOT/"events.jsonl"),
             "snapshot_path": str(ROOT/"prefix-snapshots.dpapi")}

@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import os
 import time
 import json
@@ -251,12 +252,23 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(path.read_text(encoding="utf-8"), original)
 
     def test_duplicate_start_reuses_service(self):
-        with patch.object(control, "health", return_value={"directory": str(control.ROOT)}), \
-             patch.object(control, "set_route") as route, patch.object(control, "make_server") as server, \
+        manager = MagicMock()
+        with patch.object(control, "health", return_value={"directory": str(control.ROOT), "version": control.VERSION}), \
+             patch.object(control, "ProviderRouteManager", return_value=manager), patch.object(control, "make_server") as server, \
              patch("builtins.print"):
             control.start()
-            route.assert_called_once_with(True)
+            manager.sync.assert_called_once_with()
             server.assert_not_called()
+
+    def test_sync_mode_setting_preserves_other_configuration(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root/"settings.json").write_text(json.dumps({"keep": "value"}), encoding="utf-8")
+            with patch.object(control, "ROOT", root), patch("builtins.print"):
+                control.set_sync_mode("event")
+            saved = json.loads((root/"settings.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved["provider_sync_mode"], "event")
+            self.assertEqual(saved["keep"], "value")
 
     def test_duplicate_start_refuses_running_old_code(self):
         with patch.object(control, "health", return_value={"directory": str(control.ROOT), "version": "1.0.0"}), \
@@ -268,12 +280,15 @@ class ConfigTests(unittest.TestCase):
 
     def test_unhealthy_start_does_not_change_config(self):
         server = MagicMock()
+        manager = MagicMock()
+        manager.discover.return_value = "https://example.invalid/v1"
         with patch.object(control, "health", return_value=None), \
              patch.object(control, "settings", return_value={"upstream_base_url": "https://example.invalid/v1", "port": 0, "events_path": None}), \
-             patch.object(control, "make_server", return_value=server), patch.object(control, "set_route") as route:
+             patch.object(control, "ProviderRouteManager", return_value=manager), \
+             patch.object(control, "make_server", return_value=server):
             with self.assertRaises(RuntimeError):
                 control.start()
-            route.assert_not_called()
+            manager.sync.assert_not_called()
             server.server_close.assert_called_once()
 
 
@@ -295,18 +310,24 @@ class HTTPTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.upstream = ThreadingHTTPServer(("127.0.0.1", 0), MockUpstream)
+        cls.second_upstream = ThreadingHTTPServer(("127.0.0.1", 0), MockUpstream)
         cls.upstream.received = []
+        cls.second_upstream.received = []
         cls.upstream.output = encode(summary())
         cls.upstream.content_type = "application/json"
+        cls.second_upstream.output = encode(summary("Second provider response."))
+        cls.second_upstream.content_type = "application/json"
         cls.proxy = make_server(f"http://127.0.0.1:{cls.upstream.server_port}/v1", 0)
-        for server in (cls.upstream, cls.proxy):
+        cls.headers = {"Authorization": "Bearer integration-test"}
+        cls.proxy.state.set_upstream(cls.proxy.state.upstream,
+                                     hashlib.sha256(cls.headers["Authorization"].encode()).hexdigest())
+        for server in (cls.upstream, cls.second_upstream, cls.proxy):
             threading.Thread(target=server.serve_forever, daemon=True).start()
         cls.url = f"http://127.0.0.1:{cls.proxy.server_port}/v1/responses"
-        cls.headers = {"Authorization": "Bearer integration-test"}
 
     @classmethod
     def tearDownClass(cls):
-        for server in (cls.proxy, cls.upstream):
+        for server in (cls.proxy, cls.upstream, cls.second_upstream):
             server.shutdown()
             server.server_close()
 
@@ -322,6 +343,19 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(self.upstream.received[-1]["tools"], body()["tools"])
         self.assertTrue(self.upstream.received[-1]["parallel_tool_calls"])
 
+    def test_changed_provider_upstream_receives_request(self):
+        original = f"http://127.0.0.1:{self.upstream.server_port}/v1"
+        self.addCleanup(self.proxy.state.set_upstream, original)
+        self.proxy.state.set_upstream(f"http://127.0.0.1:{self.second_upstream.server_port}/v1",
+                                     hashlib.sha256(self.headers["Authorization"].encode()).hexdigest())
+        before_old = len(self.upstream.received)
+        before_new = len(self.second_upstream.received)
+        response = requests.post(self.url, json=body(), headers=self.headers, timeout=5)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(self.upstream.received), before_old)
+        self.assertEqual(len(self.second_upstream.received), before_new+1)
+        self.assertEqual(self.second_upstream.received[-1], body())
+
     def test_invalid_summary_withheld_without_partial_sse(self):
         self.upstream.output = sse(summary(), {"type": "response.output_item.added", "item": {"type": "custom_tool_call"}})
         self.upstream.content_type = "text/event-stream"
@@ -334,6 +368,28 @@ class HTTPTests(unittest.TestCase):
         before = len(self.upstream.received)
         self.assertEqual(requests.post(self.url, json=body(), timeout=5).status_code, 401)
         self.assertEqual(len(self.upstream.received), before)
+
+    def test_route_sync_failure_fails_closed(self):
+        before = len(self.upstream.received)
+        self.proxy.state.sync_callback = lambda: (_ for _ in ()).throw(RuntimeError("synthetic failure"))
+        try:
+            response = requests.post(self.url, json=body(), headers=self.headers, timeout=5)
+        finally:
+            self.proxy.state.sync_callback = None
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(len(self.upstream.received), before)
+
+    def test_old_provider_credential_is_not_forwarded_to_new_upstream(self):
+        before = len(self.second_upstream.received)
+        self.proxy.state.set_upstream(f"http://127.0.0.1:{self.second_upstream.server_port}/v1",
+                                      hashlib.sha256(b"Bearer new-provider-key").hexdigest())
+        try:
+            response = requests.post(self.url, json=body(), headers=self.headers, timeout=5)
+        finally:
+            self.proxy.state.set_upstream(f"http://127.0.0.1:{self.upstream.server_port}/v1",
+                                          hashlib.sha256(self.headers["Authorization"].encode()).hexdigest())
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(len(self.second_upstream.received), before)
 
 
 if __name__ == "__main__":
