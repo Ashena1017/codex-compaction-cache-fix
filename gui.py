@@ -30,8 +30,8 @@ class ControlPanel(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Codex 压缩缓存修复")
-        self.geometry("860x690")
-        self.minsize(760, 620)
+        self.geometry("1020x840")
+        self.minsize(960, 780)
         self.configure(background="#f3f5f7")
         self.results = queue.Queue()
         self.busy = False
@@ -75,6 +75,7 @@ class ControlPanel(tk.Tk):
         style.configure("Section.TLabel", background=panel, foreground=text)
         style.configure("Muted.TLabel", background=panel, foreground=muted)
         style.configure("TRadiobutton", background=panel, foreground=text)
+        style.map("TRadiobutton", background=[("active", panel)], foreground=[("active", text)])
         style.configure("Action.TButton", background=accent, foreground="#ffffff")
         style.map("Action.TButton", background=[("active", hover), ("disabled", "#48545d")])
         if hasattr(self, "output"):
@@ -252,7 +253,8 @@ class ControlPanel(tk.Tk):
             self._run([APP_DIR/script], timeout=1800)
 
     def self_test(self):
-        self._run(["-m", "unittest", "discover", "-v", "-s", APP_DIR/"测试", "-t", APP_DIR])
+        test_dir = APP_DIR/"tests" if (APP_DIR/"tests").is_dir() else APP_DIR
+        self._run(["-m", "unittest", "discover", "-v", "-s", test_dir, "-t", APP_DIR])
 
     def refresh(self):
         self._run([APP_DIR/"control.py", "status"], self._show_status)

@@ -11,3 +11,6 @@ events.jsonl
 config*.toml
 *.log
 .env
+build/
+*.exe
+*.spec

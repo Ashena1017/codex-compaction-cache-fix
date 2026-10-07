@@ -8,7 +8,9 @@ from pathlib import Path
 
 
 def main():
-    install = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
+    source = Path(__file__).resolve().parent
+    install = (Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
+               else source.parent if source.name == "app" else source)
     settings_path = install / "data" / "settings.json"
     settings = json.loads(settings_path.read_text(encoding="utf-8-sig"))
     python = Path(settings.get("python_executable") or sys.executable)
