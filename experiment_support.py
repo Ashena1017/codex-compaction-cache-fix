@@ -3,9 +3,10 @@ import os
 import shutil
 import tomllib
 from pathlib import Path
+from layout import SETTINGS_FILE
 
 def read_config():
-    settings_path = Path(__file__).with_name("settings.json")
+    settings_path = SETTINGS_FILE
     settings = json.loads(settings_path.read_text(encoding="utf-8-sig")) if settings_path.exists() else {}
     default = Path(os.environ.get("CODEX_HOME", str(Path.home()/".codex")))/"config.toml"
     path = Path(settings.get("config_path", default))

@@ -12,6 +12,8 @@ def main():
     install = (Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
                else source.parent if source.name == "app" else source)
     settings_path = install / "data" / "settings.json"
+    if not settings_path.is_file():
+        raise RuntimeError("请先运行同目录的 setup.cmd 完成首次安装。需要 Python 3.11 或更新版本（包含 Tcl/Tk）。说明见 docs/INSTALL.md。")
     settings = json.loads(settings_path.read_text(encoding="utf-8-sig"))
     python = Path(settings.get("python_executable") or sys.executable)
     pythonw = python.with_name("pythonw.exe")

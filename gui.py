@@ -26,7 +26,7 @@ PYTHON = Path(_saved_settings.get("python_executable") or sys.executable)
 PYTHONW = PYTHON.with_name("pythonw.exe")
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 DETACHED = getattr(subprocess, "DETACHED_PROCESS", 0) | CREATE_NO_WINDOW
-MODE_NAMES = {"poll": "定时检查", "event": "切换后自动同步", "manual": "手动同步"}
+MODE_NAMES = {"event": "切换后自动同步（推荐）", "poll": "定时检查", "manual": "手动同步"}
 PAGE_TITLES = {
     "home": ("概览", "查看代理与 Codex 的连接状态，管理日常启停。"),
     "sync": ("供应商同步", "选择切换供应商后，怎样更新修复代理。"),
@@ -252,8 +252,8 @@ class ControlPanel(tk.Tk):
     def _build_sync(self, parent):
         self.mode = tk.StringVar(value=self._saved_mode())
         for value, title, detail in (
+            ("event", "切换后自动同步（推荐）", "CCSwitch 写入配置后，由 Windows 文件通知触发同步。无需修改 CCSwitch 安装包，更新 CCSwitch 后也能继续使用。"),
             ("poll", "定时检查", "每秒检查配置文件。切换供应商后，代理自动跟随新地址。"),
-            ("event", "切换后自动同步", "CCSwitch 写入配置后，由 Windows 文件通知触发同步。无需修改 CCSwitch 安装包，更新 CCSwitch 后也能继续使用。"),
             ("manual", "手动同步", "不自动监测。切换供应商后，在面板里点击“同步当前供应商”。"),
         ):
             card = self._card(parent)

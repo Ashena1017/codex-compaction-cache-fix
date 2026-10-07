@@ -19,6 +19,12 @@
 
 ## 安装
 
+### 下载 Windows 发行包
+
+从 [Releases](https://github.com/Ashena1017/codex-compaction-cache-fix/releases/latest) 下载 Windows ZIP，完整解压后先运行 `setup.cmd`，再双击 `CodexCompactionFix.exe`。需要预先安装 Python 3.11 或更新版本（包含 Tcl/Tk 和 pip），首次安装需要联网；EXE 是启动器，未内置完整 Python。发行包按 `app`、`data`、`shortcuts`、`docs` 分类，不含任何个人配置、API Key、日志或会话快照。详细安装和升级步骤见 [发行包安装说明](docs/INSTALL.md)。
+
+### 从源码安装
+
 在 PowerShell 中执行：
 
 ```powershell
