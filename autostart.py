@@ -99,27 +99,49 @@ def manage(action, root=ROOT):
     return value
 
 
+def run_action(action):
+    value = manage(action)
+    print("开机自启："+("已开启" if value["enabled"] else "已关闭"))
+    print("任务名称："+value["task"])
+    if action == "enable":
+        print("下次登录当前 Windows 账号后，等待 15 秒启动。现在不会另开代理。")
+        print("代理由任务计划程序运行，不会主动弹出启动窗口；可用“检查状态”确认。")
+        print("移动目录或更换 Python 前，先关闭自启，再从新位置开启。")
+    elif action == "disable":
+        print("只取消以后登录时的自动启动，当前代理继续运行。")
+    return 0
+
+
+def menu():
+    run_action("status")
+    print("\n1. 开启登录后自启\n2. 关闭登录后自启\n3. 只查看状态\n4. 退出")
+    actions = {"1": "enable", "2": "disable", "3": "status"}
+    while True:
+        selected = input("请选择 [1-4]：").strip()
+        if selected == "4":
+            return 0
+        if selected in actions:
+            return run_action(actions[selected])
+        print("请输入 1、2、3 或 4。")
+
+
 def main():
     for stream in (sys.stdout, sys.stderr):
         if stream is not None and hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("enable", "disable", "status"))
+    parser.add_argument("action", nargs="?", default="menu", choices=("enable", "disable", "status", "menu"))
     args = parser.parse_args()
     try:
-        value = manage(args.action)
+        return menu() if args.action == "menu" else run_action(args.action)
+    except EOFError:
+        return 0
+    except KeyboardInterrupt:
+        print("\n已退出。")
+        return 130
     except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
         print("没有完成："+str(error))
         return 1
-    print("开机自启："+("已开启" if value["enabled"] else "已关闭"))
-    print("任务名称："+value["task"])
-    if args.action == "enable":
-        print("下次登录当前 Windows 账号后，等待 15 秒启动。现在不会另开代理。")
-        print("代理由任务计划程序运行，不会主动弹出启动窗口；可用“检查状态”确认。")
-        print("移动目录或更换 Python 前，先关闭自启，再从新位置开启。")
-    elif args.action == "disable":
-        print("只取消以后登录时的自动启动，当前代理继续运行。")
-    return 0
 
 
 if __name__ == "__main__":
