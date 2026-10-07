@@ -9,9 +9,10 @@ import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox, ttk
-from tkinter.scrolledtext import ScrolledText
 import requests
 from layout import APP_DIR, DATA_DIR, INSTALL_DIR, SETTINGS_FILE
+from gui_widgets import ScrollableTools
+from window_theme import apply_titlebar
 
 
 ROOT = INSTALL_DIR
@@ -31,7 +32,7 @@ class ControlPanel(tk.Tk):
         super().__init__()
         self.title("Codex 压缩缓存修复")
         self.geometry("1020x840")
-        self.minsize(960, 780)
+        self.minsize(960, 640)
         self.configure(background="#f3f5f7")
         self.results = queue.Queue()
         self.busy = False
@@ -39,6 +40,7 @@ class ControlPanel(tk.Tk):
         self._style()
         self._build()
         self._apply_theme()
+        self.bind("<Map>", self._on_map, add="+")
         self.refresh()
         self.after(150, self._drain)
         self.after(2500, self._tick)
@@ -59,12 +61,14 @@ class ControlPanel(tk.Tk):
 
     def _apply_theme(self):
         if self.dark:
-            bg, panel, text, muted, field = "#111820", "#1b2630", "#edf3f6", "#a9bbc4", "#0d141a"
-            accent, hover = "#28748a", "#3193a7"
+            bg, panel, text, muted, field = "#111820", "#1b2630", "#afbec8", "#889da9", "#0d141a"
+            accent, hover, button_text = "#245b70", "#2c7188", "#bbcad2"
+            indicator_border, indicator_dot = "#4b6371", "#77a4b5"
             self.theme_button.configure(text="日间模式")
         else:
             bg, panel, text, muted, field = "#f3f5f7", "#ffffff", "#263238", "#5e6c73", "#fbfcfd"
-            accent, hover = "#28657a", "#347c91"
+            accent, hover, button_text = "#28657a", "#347c91", "#f3f6f7"
+            indicator_border, indicator_dot = "#81959f", "#28657a"
             self.theme_button.configure(text="夜间模式")
         self.configure(background=bg)
         style = ttk.Style(self)
@@ -74,13 +78,38 @@ class ControlPanel(tk.Tk):
         style.configure("Title.TLabel", background=bg, foreground=text)
         style.configure("Section.TLabel", background=panel, foreground=text)
         style.configure("Muted.TLabel", background=panel, foreground=muted)
-        style.configure("TRadiobutton", background=panel, foreground=text)
+        style.configure("Hint.TLabel", background=bg, foreground=muted, font=("Segoe UI", 9))
+        style.configure("TRadiobutton", background=panel, foreground=text,
+                        indicatorbackground=panel, indicatorforeground=indicator_dot,
+                        upperbordercolor=indicator_border, lowerbordercolor=indicator_border)
         style.map("TRadiobutton", background=[("active", panel)], foreground=[("active", text)])
-        style.configure("Action.TButton", background=accent, foreground="#ffffff")
-        style.map("Action.TButton", background=[("active", hover), ("disabled", "#48545d")])
+        style.map("TRadiobutton", indicatorbackground=[("selected", panel), ("active", panel)])
+        style.configure("Action.TButton", background=accent, foreground=button_text)
+        style.map("Action.TButton", background=[("active", hover), ("disabled", "#354650")],
+                  foreground=[("disabled", muted)])
+        slider, slider_hover = ("#415563", "#587382") if self.dark else ("#b2bfc6", "#8e9ea8")
+        style.configure("Panel.Vertical.TScrollbar", background=slider, troughcolor=field,
+                        arrowcolor=muted, bordercolor=field, lightcolor=slider, darkcolor=slider,
+                        relief="flat", borderwidth=0)
+        style.map("Panel.Vertical.TScrollbar", background=[("active", slider_hover), ("pressed", accent)],
+                  arrowcolor=[("active", text)], lightcolor=[("active", slider_hover)],
+                  darkcolor=[("active", slider_hover)])
+        style.configure("Panel.TSeparator", background=slider)
         if hasattr(self, "output"):
-            self.output.configure(background=field, foreground=text, insertbackground=text)
+            self.output.configure(background=field, foreground=text, insertbackground=text,
+                                  selectbackground=accent, selectforeground=button_text)
+        if hasattr(self, "tools"):
+            self.tools.apply_theme(panel)
         self._theme = (bg, panel, text, muted, field)
+        self.after_idle(self._apply_titlebar)
+
+    def _apply_titlebar(self):
+        bg, _panel, text, _muted, _field = self._theme
+        self.titlebar_dark_applied = apply_titlebar(self, self.dark, bg, text)
+
+    def _on_map(self, event):
+        if event.widget is self:
+            self.after_idle(self._apply_titlebar)
 
     def _build(self):
         outer = ttk.Frame(self, padding=20)
@@ -132,27 +161,42 @@ class ControlPanel(tk.Tk):
         left = ttk.Frame(lower, style="Panel.TFrame", padding=14)
         left.pack(side="left", fill="y", padx=(0, 12))
         ttk.Label(left, text="工具", style="Section.TLabel").pack(anchor="w", pady=(0, 8))
+        self.tools = ScrollableTools(left)
+        self.tools.pack(fill="both", expand=True)
+        tool_content = self.tools.content
         for label, command in (("查看压缩记录", self.show_records),
                                ("本地自检", self.self_test),
                                ("开启登录后自启", lambda: self.startup("enable")),
                                ("关闭登录后自启", lambda: self.startup("disable")),
                                ("查看自启状态", lambda: self.startup("status"))):
-            self._button(left, label, command).pack(fill="x", pady=3)
-        ttk.Separator(left).pack(fill="x", pady=9)
-        self._button(left, "合成缓存实验", lambda: self._paid_experiment("experiment.py", "约 6 次模型请求"))\
+            self._button(tool_content, label, command).pack(fill="x", pady=3)
+        ttk.Separator(tool_content, style="Panel.TSeparator").pack(fill="x", pady=9)
+        self._button(tool_content, "合成缓存实验", lambda: self._paid_experiment("experiment.py", "约 6 次模型请求"))\
             .pack(fill="x", pady=3)
-        self._button(left, "客户端运行实验", lambda: self._paid_experiment("runtime_smoke.py", "会启动 Codex 客户端并调用模型"))\
+        self._button(tool_content, "客户端运行实验", lambda: self._paid_experiment("runtime_smoke.py", "会启动 Codex 客户端并调用模型"))\
             .pack(fill="x", pady=3)
-        self._button(left, "重启恢复实验", lambda: self._paid_experiment("restart_smoke.py", "约 3 次模型请求"))\
+        self._button(tool_content, "重启恢复实验", lambda: self._paid_experiment("restart_smoke.py", "约 3 次模型请求"))\
             .pack(fill="x", pady=3)
+        for widget in tool_content.winfo_children():
+            if isinstance(widget, ttk.Button):
+                widget.bind("<FocusIn>", lambda _event, button=widget: self.tools.keep_visible(button))
 
         right = ttk.Frame(lower, style="Panel.TFrame", padding=12)
         right.pack(side="left", fill="both", expand=True)
         ttk.Label(right, text="最近操作", style="Section.TLabel").pack(anchor="w", pady=(0, 7))
-        self.output = ScrolledText(right, height=14, wrap="word", relief="flat", background="#fbfcfd",
-                                   foreground="#263238", font=("Consolas", 9), padx=9, pady=8)
-        self.output.pack(fill="both", expand=True)
+        log_area = ttk.Frame(right, style="Panel.TFrame")
+        log_area.pack(fill="both", expand=True)
+        self.output = tk.Text(log_area, height=8, width=40, wrap="word", relief="flat",
+                              highlightthickness=0, borderwidth=0, background="#fbfcfd",
+                              foreground="#263238", font=("Consolas", 9), padx=9, pady=8)
+        self.output_scroll = ttk.Scrollbar(log_area, orient="vertical", command=self.output.yview,
+                                           style="Panel.Vertical.TScrollbar")
+        self.output.configure(yscrollcommand=self.output_scroll.set)
+        self.output_scroll.pack(side="right", fill="y")
+        self.output.pack(side="left", fill="both", expand=True)
         self.output.configure(state="disabled")
+        ttk.Label(outer, text="关闭窗口后，已启动的修复代理继续运行。停用时请点“停止代理”。",
+                  style="Hint.TLabel", padding=(0, 8, 0, 0)).pack(anchor="w")
         self.protocol("WM_DELETE_WINDOW", self.destroy)
 
     def _button(self, parent, text, command):
