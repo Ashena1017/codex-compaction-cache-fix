@@ -3,6 +3,7 @@
 Reads the credential in memory, never writes it or prints request bodies/headers.
 """
 import copy
+import hashlib
 import json
 import os
 import threading
@@ -61,9 +62,16 @@ def request(url, body, key):
             "nonempty_summary": True, "tool_calls": 0}
 
 
+def make_experiment_server(base, key, port=0, snapshot_path=None):
+    server = make_server(base, port, snapshot_path=snapshot_path)
+    expected = hashlib.sha256(("Bearer "+key).encode()).hexdigest()
+    server.state.set_upstream(base, expected)
+    return server
+
+
 def run():
     base, key, model = configured_provider()
-    server = make_server(base, 0)
+    server = make_experiment_server(base, key)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     proxy_url = f"http://127.0.0.1:{server.server_port}/v1/responses"
     report = {"model": model, "upstream_host": base.split("/")[2],

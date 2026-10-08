@@ -80,17 +80,30 @@ class PrefixTests(unittest.TestCase):
         _, note = self.cache.prepare(compact, self.headers)
         self.assertEqual(note["reason"], "no-snapshot")
 
-    def test_settings_or_history_changes_skip_patch(self):
+    def test_settings_changes_are_logged_but_do_not_block_tool_restore(self):
         for field, value in (("instructions", "changed"), ("reasoning", {"effort": "low"}),
                              ("text", {"format": {"type": "json_object"}})):
             compact = body("compaction")
             compact[field] = value
-            _, note = self.cache.prepare(compact, self.headers)
-            self.assertEqual(note["reason"], "prefix-settings-changed")
+            fixed, note = self.cache.prepare(compact, self.headers)
+            self.assertTrue(note["patched"])
+            self.assertIn(field, note["changed_settings"])
+            self.assertEqual(fixed["tools"], body()["tools"])
+        legacy = next(iter(self.cache.snapshots.values()))
+        legacy.pop("settings_fields")
+        compact = body("compaction")
+        compact["instructions"] = "changed after upgrade"
+        fixed, note = self.cache.prepare(compact, self.headers)
+        self.assertTrue(note["patched"])
+        self.assertIn("legacy-settings", note["changed_settings"])
         compact = body("compaction")
         compact["input"][0]["content"] = "changed history"
-        _, note = self.cache.prepare(compact, self.headers)
-        self.assertEqual(note["reason"], "history-prefix-changed")
+        fixed, note = self.cache.prepare(compact, self.headers)
+        self.assertTrue(note["patched"])
+        self.assertEqual(note["reason"], "tool-prefix-restored-history-changed")
+        self.assertFalse(note["history_matches"])
+        self.assertEqual(note["shared_items"], 0)
+        self.assertEqual(fixed["tools"], body()["tools"])
 
     def test_noncompact_empty_tools_and_remote_compaction_unchanged(self):
         compact = body("compaction")
@@ -153,10 +166,15 @@ class PersistenceTests(unittest.TestCase):
                 self.assertEqual(restarted.prepare(changed, headers)[1]["reason"], "no-snapshot")
                 changed = body("compaction", lite=lite)
                 changed["instructions"] = "changed"
-                self.assertEqual(restarted.prepare(changed, headers)[1]["reason"], "prefix-settings-changed")
+                fixed, note = restarted.prepare(changed, headers)
+                self.assertTrue(note["patched"])
+                self.assertIn("instructions", note["changed_settings"])
                 changed = body("compaction", lite=lite)
                 changed["input"][1 if lite else 0]["content"] = "changed"
-                self.assertEqual(restarted.prepare(changed, headers)[1]["reason"], "history-prefix-changed")
+                fixed, note = restarted.prepare(changed, headers)
+                self.assertTrue(note["patched"])
+                self.assertEqual(note["reason"], "tool-prefix-restored-history-changed")
+                self.assertEqual(fixed["input"][1 if lite else 0:], changed["input"][1 if lite else 0:])
 
     def test_expiry_and_upstream_isolation_survive_restart(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -342,6 +360,12 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(response.content, self.upstream.output)
         self.assertEqual(self.upstream.received[-1]["tools"], body()["tools"])
         self.assertTrue(self.upstream.received[-1]["parallel_tool_calls"])
+
+    def test_metrics_record_upstream_provider_host(self):
+        response = requests.post(self.url, json=body(), headers=self.headers, timeout=5)
+        self.assertEqual(response.status_code, 200)
+        recent = requests.get(f"http://127.0.0.1:{self.proxy.server_port}/metrics", timeout=5).json()["recent"]
+        self.assertEqual(recent[-1]["provider"], "127.0.0.1")
 
     def test_changed_provider_upstream_receives_request(self):
         original = f"http://127.0.0.1:{self.upstream.server_port}/v1"

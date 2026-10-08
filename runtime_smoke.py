@@ -13,8 +13,7 @@ from collections import Counter
 from pathlib import Path
 from experiment_support import read_config, codex_binary
 
-from experiment import configured_provider
-from proxy import make_server
+from experiment import configured_provider, make_experiment_server
 
 
 class RPC:
@@ -99,7 +98,7 @@ class RPC:
 
 
 def run(installed=False):
-    base, _, model = configured_provider()
+    base, key, model = configured_provider()
     user_config = read_config()
     provider = user_config["model_provider"]
     server = None
@@ -108,7 +107,7 @@ def run(installed=False):
         def metrics():
             return requests.get(proxy_base.rsplit("/", 1)[0]+"/metrics", timeout=5).json()
     else:
-        server = make_server(base, 0)
+        server = make_experiment_server(base, key)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         proxy_base = f"http://127.0.0.1:{server.server_port}/v1"
         def metrics():

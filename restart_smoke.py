@@ -6,13 +6,13 @@ import tomllib
 from pathlib import Path
 from experiment_support import read_config, codex_binary
 
-from experiment import configured_provider
-from proxy import VERSION, make_server
+from experiment import configured_provider, make_experiment_server
+from proxy import VERSION
 from runtime_smoke import RPC
 
 
 def run():
-    base, _, model = configured_provider()
+    base, key, model = configured_provider()
     config = read_config()
     provider = config["model_provider"]
     binary = codex_binary(config)
@@ -20,7 +20,7 @@ def run():
               "scenario": "warm-restart-compact-continue"}
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder)/"prefix.dpapi"
-        server = make_server(base, 0, snapshot_path=path)
+        server = make_experiment_server(base, key, snapshot_path=path)
         port = server.server_port
         threading.Thread(target=server.serve_forever, daemon=True).start()
         rpc = RPC([str(binary), "app-server", "--stdio", "-c", "mcp_servers={}",
@@ -48,7 +48,7 @@ def run():
             server.shutdown()
             server.server_close()
             # A new server and PrefixCache instance, recovered only from encrypted disk.
-            server = make_server(base, port, snapshot_path=path)
+            server = make_experiment_server(base, key, port, path)
             threading.Thread(target=server.serve_forever, daemon=True).start()
             report["after_restart"] = server.state.cache.status()
             print(json.dumps({"phase": "proxy-restarted", "snapshots": report["after_restart"]}), flush=True)
