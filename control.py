@@ -257,7 +257,10 @@ def records():
         inputs = usage.get("input_tokens", 0)
         cached = (usage.get("input_tokens_details") or {}).get("cached_tokens", 0)
         hit = f"{cached/inputs:.2%}" if inputs else "未报告"
-        print(f"{stamp}  修补：{'是' if row.get('patched') else '否'}  输入：{inputs:,}  命中：{cached:,}  命中率：{hit}")
+        provider = row.get("provider", "旧记录未标注")
+        print(f"{stamp}  供应商：{provider}  修补：{'是' if row.get('patched') else '否'}  输入：{inputs:,}  命中：{cached:,}  命中率：{hit}")
+        if row.get("changed_settings"):
+            print("  设置字段有变化："+", ".join(row["changed_settings"]))
         if row.get("summary_error"):
             print("  摘要被拦截："+row["summary_error"])
         if not row.get("patched"):

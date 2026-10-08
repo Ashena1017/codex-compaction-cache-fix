@@ -21,7 +21,7 @@ import requests
 from snapshot_store import SnapshotStore
 from layout import INSTALL_DIR
 
-VERSION = "1.2.0"
+VERSION = "1.3.1"
 UNCHANGED = object()
 MAX_BODY = 64 * 1024 * 1024
 MAX_SUMMARY_STREAM = 16 * 1024 * 1024
@@ -141,7 +141,8 @@ class PrefixCache:
             note["reason"] = "non-full-input"
             return body, note
         hashes = [visible_hash(item) for item in items]
-        settings = digest({k: body.get(k) for k in ("instructions", "reasoning", "text")})
+        legacy_settings = digest({k: body.get(k) for k in ("instructions", "reasoning", "text")})
+        setting_values = {k: digest(body.get(k)) for k in ("instructions", "reasoning", "text")}
         available = tools.get("tools") if mode == "lite" and isinstance(tools, dict) else tools
         with self.lock:
             now = time.time()
@@ -150,7 +151,8 @@ class PrefixCache:
                 del self.snapshots[expired_key]
             if kind == "turn" and available:
                 self.snapshots[key] = {"tools": copy.deepcopy(tools), "hashes": hashes,
-                                       "mode": mode, "settings": settings,
+                                       "mode": mode, "settings": legacy_settings,
+                                       "settings_fields": setting_values,
                                        "parallel": body.get("parallel_tool_calls", True), "time": now}
                 self.snapshots.move_to_end(key)
                 while len(self.snapshots) > self.capacity:
@@ -167,18 +169,24 @@ class PrefixCache:
             if not snapshot:
                 note["reason"] = "no-snapshot"
                 return body, note
-            if mode != snapshot["mode"] or settings != snapshot["settings"]:
-                note["reason"] = "prefix-settings-changed"
+            if mode != snapshot["mode"]:
+                note["reason"] = "prefix-mode-changed"
                 return body, note
+            previous_settings = snapshot.get("settings_fields")
+            if isinstance(previous_settings, dict):
+                changed_settings = sorted(k for k, value in setting_values.items()
+                                          if previous_settings.get(k) != value)
+            else:
+                changed_settings = ["legacy-settings"] if legacy_settings != snapshot.get("settings") else []
             common = 0
             for previous, current in zip(snapshot["hashes"], hashes):
                 if previous != current:
                     break
                 common += 1
             note["shared_items"] = common
-            if common != len(snapshot["hashes"]):
-                note["reason"] = "history-prefix-changed"
-                return body, note
+            history_matches = common == len(snapshot["hashes"])
+            note.update(history_matches=history_matches,
+                        snapshot_items=len(snapshot["hashes"]), current_items=len(hashes))
             if available:
                 note["reason"] = "tools-already-present"
                 return body, note
@@ -188,7 +196,11 @@ class PrefixCache:
             else:
                 patched["tools"] = copy.deepcopy(snapshot["tools"])
             patched["parallel_tool_calls"] = snapshot["parallel"]
-            note.update(patched=True, reason="tool-prefix-restored", mode=mode,
+            note.update(patched=True,
+                        reason=("tool-prefix-restored-history-changed" if not history_matches else
+                                "tool-prefix-restored-settings-changed" if changed_settings else
+                                "tool-prefix-restored"),
+                        changed_settings=changed_settings, mode=mode,
                         tool_count=len(snapshot["tools"].get("tools", [])) if mode == "lite" else len(snapshot["tools"]))
             return patched, note
 
@@ -293,7 +305,9 @@ class State:
     def record(self, note):
         clean = {k: v for k, v in note.items() if k in
                  ("request_kind", "local_compaction", "patched", "reason", "shared_items",
-                  "mode", "tool_count", "status", "elapsed_ms", "usage", "summary_error", "model", "session_tag")}
+                  "history_matches", "snapshot_items", "current_items",
+                  "mode", "tool_count", "status", "elapsed_ms", "usage", "summary_error", "model", "session_tag",
+                  "provider", "changed_settings")}
         clean["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         with self.lock:
             self.counters[clean.get("reason", "request")] += 1
@@ -354,6 +368,7 @@ class Handler(BaseHTTPRequestHandler):
                 upstream = state.upstream
                 cache = state.cache
                 expected_auth = state.expected_authorization
+            provider = urlsplit(upstream).hostname
             supplied_auth = self.headers.get("Authorization", "")
             if not expected_auth:
                 note["reason"] = "provider-credential-unverifiable"
@@ -387,6 +402,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(body, dict):
                     return self.json_reply(400, {"error": {"message": "Expected a JSON object"}})
                 body, note = cache.prepare(body, dict(self.headers))
+                note["provider"] = provider
                 note["model"] = body.get("model")
                 if note["patched"]:
                     raw = encode(body)

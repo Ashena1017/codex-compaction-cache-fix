@@ -14,6 +14,7 @@
 - Codex 配置使用自定义模型供应商，并有 `[model_providers.<名称>]` 和 `base_url`。
 - HTTP Responses / Responses-lite 的本地压缩；请求带有明确的 compaction 元数据。
 - 默认监听 `127.0.0.1:28615`，自动读取当前 Codex 供应商并转发到对应上游。切换供应商后无需手动改代理地址。
+- 压缩记录标注实际上游域名；设置项和历史变化会记录诊断信息，但不再单独阻止恢复工具前缀。快照仍按账号、会话、模型和工具模式隔离。
 
 当前没有验证官方 ChatGPT 登录链路，也不支持 WebSocket、压缩请求体或 Responses V2 远端压缩。内存代理代码可在其他系统运行，但持久快照和自启管理使用 Windows API；本仓库按 Windows 工具交付。
 
@@ -105,7 +106,7 @@ Codex 更新通常不会覆盖这个独立目录，但协议变化可能使修�
 
 普通请求的工具定义参与缓存前缀。本地压缩会去掉 `tools`，并改变 `parallel_tool_calls`，使压缩与普通请求的模型可见前缀不同。
 
-代理在普通请求经过时记住工具定义、并行设置、历史 item 哈希和前缀设置。只有明确的本地压缩，且账号、聊天、模型、instructions、reasoning、text 和历史前缀匹配时，才补回工具定义。Responses-lite 会恢复开头的 `additional_tools` 条目，包括原 ID。已有工具定义的压缩请求不重复补。
+代理在普通请求经过时记住工具定义、并行设置、历史 item 哈希和前缀设置。只有明确的本地压缩，且账号、聊天、模型和工具模式匹配时，才补回工具定义；历史和设置差异会写入诊断日志，但不会阻止恢复，因为压缩请求可能重写或裁剪历史，而工具定义位于请求前部。Responses-lite 会恢复开头的 `additional_tools` 条目，包括原 ID。已有工具定义的压缩请求不重复补。
 
 补回工具后，压缩的 SSE 响应先缓冲，确认完成、包含非空 assistant 摘要、没有工具调用或其他异常输出后再交给 Codex。校验失败返回 502，避免把异常输出当成摘要。普通回复保持流式转发。
 
@@ -119,7 +120,7 @@ Codex 更新通常不会覆盖这个独立目录，但协议变化可能使修�
 - `events.jsonl` 记录 token 统计、模型、修补原因和哈希会话标签，不记录请求密钥或聊天正文。
 - `settings.json`、快照、运行日志和新实验结果均已列入 `.gitignore`。
 
-日志里的 `patched: true` 说明补回了工具前缀，不等于上游一定命中缓存。`no-snapshot` 表示没有有效快照；`prefix-settings-changed` 或 `history-prefix-changed` 表示当前请求与快照不匹配。先完成一次当前设置下的普通请求，再检查。
+日志里的 `patched: true` 说明补回了工具前缀，不等于上游一定命中缓存。`no-snapshot` 表示没有有效快照；`tool-prefix-restored-history-changed` 表示恢复时发现压缩历史与快照不同，`shared_items`、`snapshot_items`、`current_items` 可用于诊断。
 
 ## 验证与实验
 
