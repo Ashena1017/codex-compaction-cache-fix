@@ -21,7 +21,7 @@ import requests
 from snapshot_store import SnapshotStore
 from layout import INSTALL_DIR
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 UNCHANGED = object()
 MAX_BODY = 64 * 1024 * 1024
 MAX_SUMMARY_STREAM = 16 * 1024 * 1024
@@ -169,9 +169,24 @@ class PrefixCache:
             if not snapshot:
                 note["reason"] = "no-snapshot"
                 return body, note
-            if mode != snapshot["mode"]:
+            request_mode = mode
+            # A lite compaction can omit the whole additional_tools item, not
+            # just empty its tools list. The absence is not a format change:
+            # restore that item using the latest ordinary turn's layout.
+            missing_lite_prefix = snapshot["mode"] == "lite" and mode == "standard"
+            note.update(request_mode=request_mode, mode=snapshot["mode"])
+            if mode != snapshot["mode"] and not missing_lite_prefix:
                 note["reason"] = "prefix-mode-changed"
                 return body, note
+            if missing_lite_prefix:
+                if any(isinstance(item, dict) and item.get("type") == "additional_tools"
+                       for item in items):
+                    note["reason"] = "tool-prefix-not-first"
+                    return body, note
+                mode = "lite"
+                # Top-level tools can still contain native dispatch tools.
+                # They are separate from the omitted additional_tools item.
+                available = None
             previous_settings = snapshot.get("settings_fields")
             if isinstance(previous_settings, dict):
                 changed_settings = sorted(k for k, value in setting_values.items()
@@ -192,7 +207,10 @@ class PrefixCache:
                 return body, note
             patched = copy.deepcopy(body)
             if mode == "lite":
-                patched["input"][0] = copy.deepcopy(snapshot["tools"])
+                if missing_lite_prefix:
+                    patched["input"].insert(0, copy.deepcopy(snapshot["tools"]))
+                else:
+                    patched["input"][0] = copy.deepcopy(snapshot["tools"])
             else:
                 patched["tools"] = copy.deepcopy(snapshot["tools"])
             patched["parallel_tool_calls"] = snapshot["parallel"]
@@ -201,6 +219,7 @@ class PrefixCache:
                                 "tool-prefix-restored-settings-changed" if changed_settings else
                                 "tool-prefix-restored"),
                         changed_settings=changed_settings, mode=mode,
+                        prefix_action="inserted" if missing_lite_prefix else "replaced",
                         tool_count=len(snapshot["tools"].get("tools", [])) if mode == "lite" else len(snapshot["tools"]))
             return patched, note
 
@@ -306,7 +325,7 @@ class State:
         clean = {k: v for k, v in note.items() if k in
                  ("request_kind", "local_compaction", "patched", "reason", "shared_items",
                   "history_matches", "snapshot_items", "current_items",
-                  "mode", "tool_count", "status", "elapsed_ms", "usage", "summary_error", "model", "session_tag",
+                  "mode", "request_mode", "prefix_action", "tool_count", "status", "elapsed_ms", "usage", "summary_error", "model", "session_tag",
                   "provider", "changed_settings")}
         clean["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         with self.lock:

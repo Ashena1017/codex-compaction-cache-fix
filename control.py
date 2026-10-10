@@ -259,12 +259,17 @@ def records():
         hit = f"{cached/inputs:.2%}" if inputs else "未报告"
         provider = row.get("provider", "旧记录未标注")
         print(f"{stamp}  供应商：{provider}  修补：{'是' if row.get('patched') else '否'}  输入：{inputs:,}  命中：{cached:,}  命中率：{hit}")
+        if row.get("prefix_action") == "inserted":
+            print("  已补回缺失的 additional_tools 前缀，原有历史和原生工具均保留。")
         if row.get("changed_settings"):
             print("  设置字段有变化："+", ".join(row["changed_settings"]))
         if row.get("summary_error"):
             print("  摘要被拦截："+row["summary_error"])
         if not row.get("patched"):
-            print("  原因："+row.get("reason", "未知"))
+            reason = row.get("reason", "未知")
+            explanation = {"prefix-mode-changed": "请求与快照的工具格式不兼容（prefix-mode-changed）",
+                           "tool-prefix-not-first": "工具前缀出现在历史中间，未重复添加（tool-prefix-not-first）"}
+            print("  原因："+explanation.get(reason, reason))
             if row.get("reason") == "no-snapshot":
                 print("  没有匹配快照：先让这个聊天的一次普通请求经过代理。1.1 版会加密保存，供下次重启使用。")
 
