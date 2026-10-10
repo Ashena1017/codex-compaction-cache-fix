@@ -129,6 +129,56 @@ class PrefixTests(unittest.TestCase):
         self.assertIsNone(fixed["tools"])
         self.assertFalse(fixed["parallel_tool_calls"])
 
+    def test_lite_missing_entire_prefix_is_inserted_without_losing_history(self):
+        turn = body(lite=True)
+        self.cache.prepare(turn, self.headers)
+        for native_tools in (None, [], [{"type": "custom", "name": "dispatch"}]):
+            with self.subTest(native_tools=native_tools):
+                compact = body("compaction", lite=True)
+                compact["input"].pop(0)
+                compact["tools"] = native_tools
+                original = copy.deepcopy(compact)
+                fixed, note = self.cache.prepare(compact, self.headers)
+                self.assertTrue(note["patched"])
+                self.assertEqual(fixed["input"][0], turn["input"][0])
+                self.assertEqual(fixed["input"][1:], original["input"])
+                self.assertEqual(fixed["tools"], native_tools)
+                self.assertEqual(compact, original)
+                self.assertTrue(note["history_matches"])
+                self.assertEqual(note["prefix_action"], "inserted")
+                self.assertEqual(note["request_mode"], "standard")
+                self.assertEqual(note["mode"], "lite")
+                self.assertFalse(fixed["parallel_tool_calls"])
+                again, second_note = self.cache.prepare(fixed, self.headers)
+                self.assertIs(again, fixed)
+                self.assertEqual(second_note["reason"], "tools-already-present")
+
+    def test_lite_existing_tools_not_replaced(self):
+        self.cache.prepare(body(lite=True), self.headers)
+        compact = body("compaction", lite=True)
+        compact["input"][0]["tools"] = [{"type": "custom", "name": "new_tool"}]
+        fixed, note = self.cache.prepare(compact, self.headers)
+        self.assertIs(fixed, compact)
+        self.assertEqual(note["reason"], "tools-already-present")
+
+    def test_standard_snapshot_does_not_convert_explicit_lite_request(self):
+        compact = body("compaction", lite=True)
+        fixed, note = self.cache.prepare(compact, self.headers)
+        self.assertIs(fixed, compact)
+        self.assertEqual(note["reason"], "prefix-mode-changed")
+
+    def test_lite_prefix_in_another_position_is_not_duplicated(self):
+        self.cache.prepare(body(lite=True), self.headers)
+        for tools in ([], body(lite=True)["input"][0]["tools"]):
+            with self.subTest(tools=tools):
+                compact = body("compaction", lite=True)
+                prefix = compact["input"].pop(0)
+                prefix["tools"] = tools
+                compact["input"].insert(1, prefix)
+                fixed, note = self.cache.prepare(compact, self.headers)
+                self.assertIs(fixed, compact)
+                self.assertEqual(note["reason"], "tool-prefix-not-first")
+
     def test_expired_snapshots_skipped(self):
         self.cache.ttl = -1
         self.assertEqual(self.cache.prepare(body("compaction"), self.headers)[1]["reason"], "no-snapshot")
@@ -154,6 +204,15 @@ class PersistenceTests(unittest.TestCase):
                 self.assertEqual(restarted.status()["restored_at_start"], 1)
                 fixed, note = restarted.prepare(body("compaction", lite=lite), headers)
                 self.assertTrue(note["patched"])
+                if lite:
+                    compact = body("compaction", lite=True)
+                    compact["input"].pop(0)
+                    original_items = copy.deepcopy(compact["input"])
+                    restored, restored_note = restarted.prepare(compact, headers)
+                    self.assertTrue(restored_note["patched"])
+                    self.assertEqual(restored["input"][0], body(lite=True)["input"][0])
+                    self.assertEqual(restored["input"][1:], original_items)
+                    self.assertEqual(restored_note["prefix_action"], "inserted")
                 if lite:
                     self.assertEqual(fixed["input"][0], body(lite=True)["input"][0])
                 else:
@@ -366,6 +425,29 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         recent = requests.get(f"http://127.0.0.1:{self.proxy.server_port}/metrics", timeout=5).json()["recent"]
         self.assertEqual(recent[-1]["provider"], "127.0.0.1")
+
+    def test_http_missing_lite_prefix_restored_and_diagnostic_recorded(self):
+        self.upstream.output = encode(summary())
+        self.upstream.content_type = "application/json"
+        turn = body(lite=True)
+        self.assertEqual(requests.post(self.url, json=turn, headers=self.headers, timeout=5).status_code, 200)
+        compact = body("compaction", lite=True)
+        compact["input"].pop(0)
+        compact["tools"] = [{"type": "custom", "name": "dispatch"}]
+        self.upstream.output = sse(summary())
+        self.upstream.content_type = "text/event-stream"
+        response = requests.post(self.url, json=compact, headers=self.headers, timeout=5)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, self.upstream.output)
+        forwarded = self.upstream.received[-1]
+        self.assertEqual(forwarded["input"][0], turn["input"][0])
+        self.assertEqual(forwarded["input"][1:], compact["input"])
+        self.assertEqual(forwarded["tools"], compact["tools"])
+        recent = requests.get(f"http://127.0.0.1:{self.proxy.server_port}/metrics", timeout=5).json()["recent"]
+        self.assertTrue(recent[-1]["patched"])
+        self.assertEqual(recent[-1]["prefix_action"], "inserted")
+        self.assertEqual(recent[-1]["request_mode"], "standard")
+        self.assertEqual(recent[-1]["mode"], "lite")
 
     def test_changed_provider_upstream_receives_request(self):
         original = f"http://127.0.0.1:{self.upstream.server_port}/v1"
